@@ -2,12 +2,15 @@ all: vga_switch
 
 CFLAGS?=-Wall -Wextra -std=gnu99 -O2 -g -flto=4
 
+CFLAGS+=$(shell pkg-config --cflags libdrm)
+LIBS=$(shell pkg-config --libs libdrm)
+
 OBJS =  \
 	switch.o \
 #
 
 vga_switch: ${OBJS}
-	${CC} ${CFLAGS} $< -o $@
+	${CC} ${CFLAGS} ${LIBS} $< -o $@
 
 clean:
 	${RM} ${OBJS} vga_switch
