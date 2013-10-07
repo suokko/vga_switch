@@ -16,7 +16,7 @@ clean:
 	${RM} ${OBJS} vga_switch
 
 install: vga_switch
-	install -m 0755 vga_switch /sbin/vga_switch
+	install -m 6755 vga_switch /sbin/vga_switch
 
 uninstall:
 	${RM} /sbin/vga_switch

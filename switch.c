@@ -16,9 +16,10 @@
 static const char *SWITCH_PATH = "/sys/kernel/debug/vgaswitcheroo/switch";
 
 struct options {
-	unsigned sleep : 2;
+	unsigned sleep : 3;
 	unsigned switch_dis : 1;
 	unsigned switch_igd : 1;
+	unsigned wakeup_lvds : 1;
 };
 
 static struct options goptions = {0};
@@ -79,9 +80,10 @@ static void usage(const char *prog, const char*msg, int status)
 		"%s [OPTIONS]\n"
 		"\n"
 		"-h\tThis help\n"
-		"-s pre|post\tpre sleep and post sleep operation\n"
+		"-s pre|post|off|on\tpre sleep and post sleep operation\n"
 		"-d\tSwitch to discrete card\n"
 		"-i\tSwitch to integrated card\n"
+		"-w\tWakeup lvds\n"
 		, msg, prog
 		);
 	exit(status);
@@ -112,31 +114,36 @@ static int handle_sleep(void)
 		return r;
 	}
 
-	r = daemon(0,0);
-	if (r < 0) {
-		r = errno;
-		perror("daemon: ");
-		return r;
+	if ((goptions.sleep & 4) == 4) {
+		r = daemon(0,0);
+		if (r < 0) {
+			r = errno;
+			perror("daemon: ");
+			fclose(f);
+			return r;
+		}
+
+		for (r = SIGHUP; r < SIGSYS; r++)
+			signal(r, handler);
+
+		killprevious();
 	}
-
-	for (r = SIGHUP; r < SIGSYS; r++)
-		signal(r, handler);
-
-	killprevious();
 	
-	if (goptions.sleep == 1) {
+	if ((goptions.sleep & 1) == 1) {
 		syslog(LOG_USER | LOG_INFO, "switch writing %s", ON);
 		if (fwrite(ON, 1, 2, f) != 2)
 			syslog(LOG_USER | LOG_ERR, "switch %s failed %d", ON, errno);
 		syslog(LOG_USER | LOG_INFO, "switch written %s", ON);
 	} else {
-		assert(goptions.sleep == 2);
-		syslog(LOG_USER | LOG_INFO, "switch writing delayed %s", OFF);
-		struct timespec tp;
-		clock_gettime(CLOCK_MONOTONIC, &tp);
-		tp.tv_sec += 10;
+		assert((goptions.sleep & 2) == 2);
+		if ((goptions.sleep & 4) == 4) {
+			syslog(LOG_USER | LOG_INFO, "switch writing delayed %s", OFF);
+			struct timespec tp;
+			clock_gettime(CLOCK_MONOTONIC, &tp);
+			tp.tv_sec += 4;
 
-		while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &tp, NULL) == EINTR) {
+			while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &tp, NULL) == EINTR) {
+			}
 		}
 		syslog(LOG_USER | LOG_INFO, "switch writing %s", OFF);
 		if (fwrite(OFF, 1, 3, f) != 3)
@@ -178,7 +185,8 @@ static void wakeup_display(int fd)
 				printf("%s = %lu\n", props->name, conn->prop_values[j]);
 				syslog(LOG_USER | LOG_INFO, "Current dpms %lu", conn->prop_values[j]);
 				if (conn->prop_values[j] != 0) {
-					drmModeObjectSetProperty(fd, conn->connector_id, DRM_MODE_OBJECT_CONNECTOR, props->prop_id, 0);
+					drmModeObjectSetProperty(fd, conn->connector_id, DRM_MODE_OBJECT_CONNECTOR, props->prop_id, DRM_MODE_DPMS_ON);
+					syslog(LOG_USER | LOG_INFO, "HACK: Wokeup intel lvds");
 				}
 			}
 	
@@ -187,6 +195,57 @@ static void wakeup_display(int fd)
 
 		drmFree(conn);
 	}
+}
+
+static int wakeup_intel_lvds()
+{
+	char buffer[4096];
+	char *buf = buffer;
+	FILE *f = fopen(SWITCH_PATH, "r");
+	ssize_t s;
+	while ((s = fread(buf, 1, sizeof(buffer) - 1, f)) > 0) {
+		buf += s;
+	}
+	buf[s] = '\0';
+	buf = buffer - 1;
+
+	do {
+		buf++;
+		int id;
+		int r;
+		char type[4], def[2], power[4], pci[17];
+		strcpy(pci, "pci:");
+		r = sscanf(buf, "%d:%3s:%c:%3s:%12s\n",
+				&id, type, def, power, pci + 4);
+		if (r < 5)
+			continue;
+
+		if (strcmp(type, "IGD") != 0)
+			continue;
+
+		if (def[0] == '+') {
+			syslog(LOG_USER | LOG_INFO, "Using IGD as primary no need to apply HACK");
+			//return 0;
+		}
+
+		syslog(LOG_USER | LOG_INFO, "%d:%3s:%1c:%3s:%12s",
+				id, type, def[0], power, pci);
+
+		int fd = drmOpen("", pci);
+
+		if (fd < 0) {
+			syslog(LOG_USER | LOG_ERR, "drmOpen: %s", strerror(errno));
+			continue;
+		}
+
+		wakeup_display(fd);
+
+		drmClose(fd);
+	} while ((buf = strchr(buf, '\n')));
+
+	fclose(f);
+	syslog(LOG_USER | LOG_INFO, "switch done");
+	return 0;
 }
 
 static int handle_switch()
@@ -241,18 +300,6 @@ static int handle_switch()
 
 		syslog(LOG_USER | LOG_INFO, "%d:%3s:%1c:%3s:%12s",
 				id, type, def[0], power, pci);
-#if 0
-		int fd = drmOpen("", pci);
-
-		if (fd < 0) {
-			syslog(LOG_USER | LOG_ERR, "drmOpen: %s", strerror(errno));
-			continue;
-		}
-
-		wakeup_display(fd);
-
-		drmClose(fd);
-#endif
 	} while ((buf = strchr(buf, '\n')));
 
 	fclose(f);
@@ -264,12 +311,16 @@ static void parse(int argc, char * const * argv)
 {
 	int opt;
 
-	while ((opt = getopt(argc, argv, "s:dih")) != -1) {
+	while ((opt = getopt(argc, argv, "s:dihw")) != -1) {
 		switch (opt) {
 		case 's':
 			if (strcmp("post", optarg) == 0)
-				goptions.sleep = 2;
+				goptions.sleep = 6;
 			else if (strcmp("pre", optarg) == 0)
+				goptions.sleep = 5;
+			else if (strcmp("off", optarg) == 0)
+				goptions.sleep = 2;
+			else if (strcmp("on", optarg) == 0)
 				goptions.sleep = 1;
 			else
 				usage(argv[0], "Invalid parameter to sleep switching\n\n", -1);
@@ -280,8 +331,12 @@ static void parse(int argc, char * const * argv)
 		case 'i':
 			goptions.switch_igd = 1;
 			break;
+		case 'w':
+			goptions.wakeup_lvds = 1;
+			break;
 		case 'h':
 			usage(argv[0], "", 0);
+			break;
 		default:
 			usage(argv[0], "Invalid parameter.\n\n", -1);
 		}
@@ -299,5 +354,7 @@ int main(int argc, char * const * argv)
 		return handle_sleep();
 	else if (goptions.switch_dis || goptions.switch_igd)
 		return handle_switch();
+	else if (goptions.wakeup_lvds)
+		return wakeup_intel_lvds();
 	return print();
 }
