@@ -7,3 +7,22 @@ may not work on your system with completely different paths and/or tools. Please
 first check that all hard coded paths and tools exists. Most likely candidate of
 problems seems to be update-rc.d script name and debugfs mounting.
 
+** Usage **
+
+vga_switch can be used to switch between cards and mange power of secondary
+card as normal user. It also provides nice hook to systemd and pm util sleep
+functions to avoid card wakeup bug in kernel.
+
+vga_switch -i
+vga_switch -d
+vga_switch -s off
+vga_switch -s on
+vga_switch
+
+vga_prime takes one number as paramatere defining the card to run with and after
+that command to run. It user vga_switch internaly to power on and off secondary
+card automatically based on mmaped reference count file.
+
+vga_prime 1 glxinfo
+vga_prime 0 glxgears -info
+
