@@ -1,0 +1,13 @@
+#!/bin/sh
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+case "${1}" in
+	hibernate|suspend|suspend_hybrid)
+		/sbin/vga_switch -s pre
+                ;;
+        resume|thaw)
+		/sbin/vga_switch -s post
+                ;;
+esac
+

@@ -30,6 +30,8 @@ install: vga_switch
 	install -m 0644 98vga_switch_hack /etc/X11/Xsession.d/98vga_switch_hack
 	install -m 0755 init.script /etc/init.d/vga_switch
 	update-rc.d vga_switch defaults
+	install -m 0755 pm-vga /etc/pm/sleep.d/vga
+	install -m 0755 systemd-vga.sh /lib/systemd/system-sleep/vga.sh
 
 uninstall:
 	${RM} /sbin/vga_switch
@@ -37,3 +39,5 @@ uninstall:
 	${RM} /etc/X11/Xsession.d/98vga_switch_hack
 	update-rc.d vga_switch remove
 	${RM} /etc/init.d/vga_switch
+	${RM} /etc/pm/sleep.d/vga
+	${RM} /lib/systemd/system-sleep/vga.sh
