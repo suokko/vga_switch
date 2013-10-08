@@ -1,0 +1,9 @@
+vga_switch is a hack helper tool to work around missing driver functionality.
+Code is purely written for a hybrid graphics system with always shared display
+connection through IGD (intel-radeon).
+
+It might be useful for someone else with similar system but be careful that code
+may not work on your system with completely different paths and/or tools. Please
+first check that all hard coded paths and tools exists. Most likely candidate of
+problems seems to be update-rc.d script name and debugfs mounting.
+
