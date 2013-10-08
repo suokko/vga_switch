@@ -27,20 +27,41 @@ THE SOFTWARE.
 #include <sys/types.h>
 #include <sys/wait.h>
 
+static int card = 0;
+pid_t pid = 0;
+
+void term_handler(int sig)
+{
+	/* forward terminating signal to child */
+	if (pid > 0)
+		kill(pid, sig);
+
+	if (card > 0)
+		system("/sbin/vga_switch -g stop");
+
+	exit(0);
+}
+
 int main(int nr, char * const *args)
 {
+	int sig;
 	if (nr < 3) {
 		printf("You need to pass prime card number and then command to run\n");
 		return 1;
 	}
 
-	int card = atoi(args[1]);
+	card = atoi(args[1]);
 
-	if (card > 0) {
+	for (sig = SIGHUP; sig < SIGSYS; sig++)
+		signal(sig, SIG_IGN);
+
+	signal(SIGTERM, term_handler);
+	signal(SIGINT, term_handler);
+
+	if (card > 0)
 		system("/sbin/vga_switch -g start");
-	}
 
-	pid_t pid = fork();
+	pid = fork();
 	
 	if (pid < 0) {
 		perror("fork:");
@@ -59,9 +80,8 @@ int main(int nr, char * const *args)
 		execvp(args[2], &args[2]);
 	}
 	
-	if (card > 0) {
+	if (card > 0)
 		system("/sbin/vga_switch -g stop");
-	}
 
 	return 0;
 }
