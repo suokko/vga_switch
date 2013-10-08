@@ -35,11 +35,6 @@ void term_handler(int sig)
 	/* forward terminating signal to child */
 	if (pid > 0)
 		kill(pid, sig);
-
-	if (card > 0)
-		system("/sbin/vga_switch -g stop");
-
-	exit(0);
 }
 
 int main(int nr, char * const *args)
