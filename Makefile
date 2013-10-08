@@ -27,7 +27,13 @@ clean:
 install: vga_switch
 	install -m 6755 vga_switch /sbin/vga_switch
 	install -m 0755 prime /usr/bin/vga_prime
+	install -m 0644 98vga_switch_hack /etc/X11/Xsession.d/98vga_switch_hack
+	install -m 0755 init.script /etc/init.d/vga_switch
+	update-rc.d vga_switch defaults
 
 uninstall:
 	${RM} /sbin/vga_switch
 	${RM} /usr/bin/vga_prime
+	${RM} /etc/X11/Xsession.d/98vga_switch_hack
+	update-rc.d vga_switch remove
+	${RM} /etc/init.d/vga_switch

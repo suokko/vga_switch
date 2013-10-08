@@ -143,7 +143,7 @@ static int handle_sleep(void)
 			syslog(LOG_USER | LOG_INFO, "switch writing delayed %s", OFF);
 			struct timespec tp;
 			clock_gettime(CLOCK_MONOTONIC, &tp);
-			tp.tv_sec += 4;
+			tp.tv_sec += 10;
 
 			while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &tp, NULL) == EINTR) {
 			}
@@ -175,7 +175,6 @@ static void wakeup_display(int fd)
 			continue;
 		}
 
-		//drmModeSetCrtc(drmModeSetCrtc(fd, res->crtc[0], bufferId, 0, 0, &res->connectors[i], 1, mode);
 		int j;
 		for (j = 0; j < conn->count_props; j++) {
 			drmModePropertyPtr props = drmModeGetProperty(fd, conn->props[j]);

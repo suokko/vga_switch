@@ -1,0 +1,13 @@
+
+
+#FIXME if running on IGD should propaply do this
+
+if grep -q "^BOOT=intel" /etc/vga_switch.conf; then
+	xrandr --setprovideroffloadsink radeon Intel
+	sh -c "vga_switch -g start; sleep 10; vga_switch -g stop;" &
+else
+	xrandr --setprovideroutputsource Intel radeon
+	xrandr --output LVDS2 --auto
+fi
+
+# vim:set ai et sts=2 sw=2 tw=80:
