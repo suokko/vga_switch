@@ -1,4 +1,4 @@
-all: vga_switch prime
+all: vga_switch vga_prime
 
 CFLAGS?=-Wall -Wextra -std=gnu99 -O2 -g -flto=4
 
@@ -15,18 +15,18 @@ OBJS_PRIME = \
 
 OBJS_ALL = ${OBJS_PRIME} ${OBJS}
 
-prime: ${OBJS_PRIME}
+vga_prime: ${OBJS_PRIME}
 	${CC} ${CFLAGS} ${LIBS} $< -o $@
 
 vga_switch: ${OBJS}
 	${CC} ${CFLAGS} ${LIBS} $< -o $@
 
 clean:
-	${RM} ${OBJS_ALL} vga_switch prime
+	${RM} ${OBJS_ALL} vga_switch vga_prime
 
 install: vga_switch
 	install -m 6755 vga_switch /sbin/vga_switch
-	install -m 0755 prime /usr/bin/vga_prime
+	install -m 0755 vga_prime /usr/bin/vga_prime
 	install -m 0644 98vga_switch_hack /etc/X11/Xsession.d/98vga_switch_hack
 	install -m 0755 init.script /etc/init.d/vga_switch
 	update-rc.d vga_switch defaults
