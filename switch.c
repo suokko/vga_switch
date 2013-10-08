@@ -9,10 +9,12 @@
 #include <stdlib.h>
 #include <libgen.h>
 #include <assert.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include <xf86drm.h>
 #include <xf86drmMode.h>
-
 static const char *SWITCH_PATH = "/sys/kernel/debug/vgaswitcheroo/switch";
 
 struct options {
@@ -20,6 +22,7 @@ struct options {
 	unsigned switch_dis : 1;
 	unsigned switch_igd : 1;
 	unsigned wakeup_lvds : 1;
+	unsigned prime : 2;
 };
 
 static struct options goptions = {0};
@@ -307,11 +310,44 @@ static int handle_switch()
 	return 0;
 }
 
+static int prime_start_stop(void)
+{
+	int fd = open("/run/vga_switch_gl_count", O_CREAT | O_RDWR, 00777);
+	if (fd < 0) {
+		perror("Failed to open refcount fail");
+		return -1;
+	}
+	fchmod(fd, 00777);
+
+	ftruncate(fd, getpagesize());
+
+	int *refcnt = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (refcnt == MAP_FAILED) {
+		perror("mmap");
+		return -2;
+	}
+
+	if (goptions.prime == 1) {
+		/* start */
+		if (__sync_fetch_and_add(refcnt, 1) == 0) {
+			goptions.sleep = 1;
+			handle_sleep();
+		}
+	} else {
+		/* stop */
+		if (__sync_add_and_fetch(refcnt, -1) == 0) {
+			goptions.sleep = 2;
+			handle_sleep();
+		}
+	}
+	return 0;
+}
+
 static void parse(int argc, char * const * argv)
 {
 	int opt;
 
-	while ((opt = getopt(argc, argv, "s:dihw")) != -1) {
+	while ((opt = getopt(argc, argv, "s:dihwg:")) != -1) {
 		switch (opt) {
 		case 's':
 			if (strcmp("post", optarg) == 0)
@@ -324,6 +360,14 @@ static void parse(int argc, char * const * argv)
 				goptions.sleep = 1;
 			else
 				usage(argv[0], "Invalid parameter to sleep switching\n\n", -1);
+			break;
+		case 'g':
+			if (strcmp("start", optarg) == 0)
+				goptions.prime = 1;
+			else if (strcmp("stop", optarg) == 0)
+				goptions.prime = 2;
+			else
+				usage(argv[0], "Invalid parameter to gl start parameter\n\n", -1);
 			break;
 		case 'd':
 			goptions.switch_dis = 1;
@@ -356,5 +400,7 @@ int main(int argc, char * const * argv)
 		return handle_switch();
 	else if (goptions.wakeup_lvds)
 		return wakeup_intel_lvds();
+	else if (goptions.prime)
+		return prime_start_stop();
 	return print();
 }
