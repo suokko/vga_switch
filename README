@@ -7,6 +7,14 @@ may not work on your system with completely different paths and/or tools. Please
 first check that all hard coded paths and tools exists. Most likely candidate of
 problems seems to be update-rc.d script name and debugfs mounting.
 
+** Build **
+
+Only dependency is c compiler and unix c library. Runtime dependecies are linux
+debugfs with vgaswitcheroo support and xrandr 1.4 with xserver 2.13.
+
+make
+make install
+
 ** Usage **
 
 vga_switch can be used to switch between cards and mange power of secondary
@@ -26,3 +34,36 @@ card automatically based on mmaped reference count file.
 vga_prime 1 glxinfo
 vga_prime 0 glxgears -info
 
+** Components **
+
+/sbin/vga_switch
+
+The hack setuid binary. It may break your system with sys admin capability.
+
+/usr/bin/vga_prime
+
+Very minimal wrapper tool to run as user to set VGA_PRIME environment variable
+and power on secondary CPU on demand.
+
+/etc/X11/Xsession.d/98vga_switch_hack
+
+Automatic setup that is required to keep intel on when starting X with discreet
+card as primary. It also setups offload connection between cards when intel is
+primary.
+
+/etc/init.d/vga_switch
+
+Early boot switch making sure swithc to discreet card happens before Xorg starts.
+
+/etc/pm/sleep.d/vga
+
+pm utils hack script to make sure that radeon is powered on before suspend to
+avoid it locking up.
+
+/lib/systemd/system-sleep/vga.sh
+
+Same as above for systemd configuration.
+
+/etc/vga_switch.conf
+
+Simple config to select card during boot.
