@@ -42,7 +42,7 @@ The hack setuid binary. It may break your system with sys admin capability.
 
 /usr/bin/vga_prime
 
-Very minimal wrapper tool to run as user to set VGA_PRIME environment variable
+Very minimal wrapper tool to run as user to set DRI_PRIME environment variable
 and power on secondary CPU on demand.
 
 /etc/X11/Xsession.d/98vga_switch_hack
@@ -53,7 +53,7 @@ primary.
 
 /etc/init.d/vga_switch
 
-Early boot switch making sure swithc to discreet card happens before Xorg starts.
+Early boot switch making sure switch to discreet card happens before Xorg starts.
 
 /etc/pm/sleep.d/vga
 
