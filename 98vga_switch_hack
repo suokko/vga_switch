@@ -2,7 +2,7 @@
 
 #FIXME if running on IGD should propaply do this
 
-if grep -q "^BOOT=intel" /etc/vga_switch.conf; then
+if [ $(vga_switch -q default) = "IGD" ]; then
 	xrandr --setprovideroffloadsink radeon Intel
 	sh -c "vga_switch -g start; sleep 10; vga_switch -g stop;" &
 else

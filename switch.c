@@ -37,7 +37,11 @@ THE SOFTWARE.
 
 #include <xf86drm.h>
 #include <xf86drmMode.h>
-static const char *SWITCH_PATH = "/sys/kernel/debug/vgaswitcheroo/switch";
+
+#include "switch.h"
+#include "parse.h"
+
+const char *SWITCH_PATH = "/sys/kernel/debug/vgaswitcheroo/switch";
 
 struct options {
 	unsigned sleep : 3;
@@ -109,6 +113,7 @@ static void usage(const char *prog, const char*msg, int status)
 		"-d\tSwitch to discrete card\n"
 		"-i\tSwitch to integrated card\n"
 		"-w\tWakeup lvds\n"
+		"-q default\tQuery current state of switching\n"
 		, msg, prog
 		);
 	exit(status);
@@ -223,37 +228,25 @@ static void wakeup_display(int fd)
 
 static int wakeup_intel_lvds()
 {
-	char buffer[4096];
-	char *buf = buffer;
-	FILE *f = fopen(SWITCH_PATH, "r");
-	ssize_t s;
-	while ((s = fread(buf, 1, sizeof(buffer) - 1, f)) > 0) {
-		buf += s;
+	struct switch_data data;
+	int r, d;
+
+	if ((r = parse_switch(&data))) {
+		return r;
 	}
-	buf[s] = '\0';
-	buf = buffer - 1;
 
-	do {
-		buf++;
-		int id;
-		int r;
-		char type[4], def[2], power[4], pci[17];
-		strcpy(pci, "pci:");
-		r = sscanf(buf, "%d:%3s:%c:%3s:%12s\n",
-				&id, type, def, power, pci + 4);
-		if (r < 5)
+	for (d = 0; d < data.nr; d++) {
+		if (data.devs[d].type != SWITCH_IGD)
 			continue;
 
-		if (strcmp(type, "IGD") != 0)
-			continue;
-
-		if (def[0] == '+') {
+		if (data.devs[d].def == 1) {
 			syslog(LOG_USER | LOG_INFO, "Using IGD as primary no need to apply HACK");
-			//return 0;
+			return 0;
 		}
 
-		syslog(LOG_USER | LOG_INFO, "%d:%3s:%1c:%3s:%12s",
-				id, type, def[0], power, pci);
+		char pci[17];
+
+		sprintf(pci, "pci:%s", data.devs[d].pci);
 
 		int fd = drmOpen("", pci);
 
@@ -265,10 +258,7 @@ static int wakeup_intel_lvds()
 		wakeup_display(fd);
 
 		drmClose(fd);
-	} while ((buf = strchr(buf, '\n')));
-
-	fclose(f);
-	syslog(LOG_USER | LOG_INFO, "switch done");
+	}
 	return 0;
 }
 
@@ -276,9 +266,7 @@ static int handle_switch()
 {
 	static const char *DIS = "DIS";
 	static const char *IGD = "IGD";
-	char buffer[1024*16];
-	char *buf = buffer;
-	size_t s;
+	int r;
 	const char *switch_to = goptions.switch_dis ? DIS : IGD;
 	FILE *f = fopen(SWITCH_PATH, "w");
 	syslog(LOG_USER | LOG_INFO, "switch writing %s", switch_to);
@@ -292,41 +280,25 @@ static int handle_switch()
 	if (goptions.switch_dis) {
 		f = fopen(SWITCH_PATH, "w");
 		syslog(LOG_USER | LOG_INFO, "Enable integrated");
-		if (fwrite("ON", 1, 2, f) != 3)
+		if (fwrite("ON", 1, 2, f) != 2)
 			syslog(LOG_USER | LOG_ERR, "Enabling IGD failed (%d)", errno);
 
 		fclose(f);
 	}
 
-	f = fopen(SWITCH_PATH, "r");
-	while ((s = fread(buf, 1, sizeof(buffer) - 1, f)) > 0) {
-		buf += s;
-	}
-	buf[s] = '\0';
-	buf = buffer - 1;
+	struct switch_data data;
 
-	do {
-		buf++;
-		int id;
-		int r;
-		char type[4], def[2], power[4], pci[17];
-		strcpy(pci, "pci:");
-		r = sscanf(buf, "%d:%3s:%c:%3s:%12s\n",
-				&id, type, def, power, pci + 4);
-		if (r < 5)
+	if ((r = parse_switch(&data)))
+		return r;
+
+	for (r = 0; r < data.nr; r++) {
+		if (strcmp(switch_types[data.devs[r].type], switch_to) != 0)
 			continue;
-
-		if (strcmp(type, switch_to) != 0)
-			continue;
-
-		if (def[0] != '+' || strcmp("Pwr", power) != 0)
+	
+		if (!data.devs[r].def || !data.devs[r].power)
 			syslog(LOG_USER | LOG_INFO, "Switch not completed yet");
+	}
 
-		syslog(LOG_USER | LOG_INFO, "%d:%3s:%1c:%3s:%12s",
-				id, type, def[0], power, pci);
-	} while ((buf = strchr(buf, '\n')));
-
-	fclose(f);
 	syslog(LOG_USER | LOG_INFO, "switch done");
 	return 0;
 }
@@ -364,11 +336,33 @@ static int prime_start_stop(void)
 	return 0;
 }
 
+static void switch_query(const char *arg)
+{
+	struct switch_data data;
+
+	if (parse_switch(&data)) {
+		exit(-1);
+	}
+
+	if (strcmp(arg, "default") == 0) {
+		int d;
+
+		for (d = 0; d < data.nr; d++) {
+			if (data.devs[d].def) {
+				printf("%s\n", switch_types[data.devs[d].type]);
+				exit(0);
+			}
+		}
+		printf("Error: No default device found.\n");
+		exit(-2);
+	}
+}
+
 static void parse(int argc, char * const * argv)
 {
 	int opt;
 
-	while ((opt = getopt(argc, argv, "s:dihwg:")) != -1) {
+	while ((opt = getopt(argc, argv, "s:dihwg:q:")) != -1) {
 		switch (opt) {
 		case 's':
 			if (strcmp("post", optarg) == 0)
@@ -401,6 +395,9 @@ static void parse(int argc, char * const * argv)
 			break;
 		case 'h':
 			usage(argv[0], "", 0);
+			break;
+		case 'q':
+			switch_query(optarg);
 			break;
 		default:
 			usage(argv[0], "Invalid parameter.\n\n", -1);

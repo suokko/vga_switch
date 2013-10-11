@@ -7,6 +7,7 @@ LIBS=$(shell pkg-config --libs libdrm)
 
 OBJS =  \
 	switch.o \
+	parse.o \
 #
 
 OBJS_PRIME = \
@@ -16,10 +17,10 @@ OBJS_PRIME = \
 OBJS_ALL = ${OBJS_PRIME} ${OBJS}
 
 vga_prime: ${OBJS_PRIME}
-	${CC} ${CFLAGS} ${LIBS} $< -o $@
+	${CC} ${CFLAGS} ${LIBS} $^ -o $@
 
 vga_switch: ${OBJS}
-	${CC} ${CFLAGS} ${LIBS} $< -o $@
+	${CC} ${CFLAGS} ${LIBS} $^ -o $@
 
 clean:
 	${RM} ${OBJS_ALL} vga_switch vga_prime
