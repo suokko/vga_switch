@@ -320,16 +320,16 @@ static int prime_start_stop(void)
 		return -2;
 	}
 
-	if (goptions.prime == 1) {
+	if (goptions.prime & 1) {
 		/* start */
 		if (__sync_fetch_and_add(refcnt, 1) == 0) {
-			goptions.sleep = 1;
+			goptions.sleep = goptions.prime;
 			handle_sleep();
 		}
 	} else {
 		/* stop */
 		if (__sync_add_and_fetch(refcnt, -1) == 0) {
-			goptions.sleep = 2;
+			goptions.sleep = goptions.prime;
 			handle_sleep();
 		}
 	}
@@ -366,9 +366,9 @@ static void parse(int argc, char * const * argv)
 		switch (opt) {
 		case 's':
 			if (strcmp("post", optarg) == 0)
-				goptions.sleep = 6;
+				goptions.prime = 6;
 			else if (strcmp("pre", optarg) == 0)
-				goptions.sleep = 5;
+				goptions.prime = 5;
 			else if (strcmp("off", optarg) == 0)
 				goptions.sleep = 2;
 			else if (strcmp("on", optarg) == 0)
