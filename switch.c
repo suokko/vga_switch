@@ -34,6 +34,7 @@ THE SOFTWARE.
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 #include <xf86drm.h>
 #include <xf86drmMode.h>
@@ -48,7 +49,7 @@ struct options {
 	unsigned switch_dis : 1;
 	unsigned switch_igd : 1;
 	unsigned wakeup_lvds : 1;
-	unsigned prime : 2;
+	unsigned prime : 3;
 };
 
 static struct options goptions = {0};
@@ -158,7 +159,7 @@ static int handle_sleep(void)
 
 		killprevious();
 	}
-	
+
 	if ((goptions.sleep & 1) == 1) {
 		syslog(LOG_USER | LOG_INFO, "switch writing %s", ON);
 		if (fwrite(ON, 1, 2, f) != 2)
@@ -218,7 +219,7 @@ static void wakeup_display(int fd)
 					syslog(LOG_USER | LOG_INFO, "HACK: Wokeup intel lvds");
 				}
 			}
-	
+
 			drmModeFreeProperty(props);
 		}
 
@@ -294,7 +295,7 @@ static int handle_switch()
 	for (r = 0; r < data.nr; r++) {
 		if (strcmp(switch_types[data.devs[r].type], switch_to) != 0)
 			continue;
-	
+
 		if (!data.devs[r].def || !data.devs[r].power)
 			syslog(LOG_USER | LOG_INFO, "Switch not completed yet");
 	}
@@ -322,13 +323,17 @@ static int prime_start_stop(void)
 
 	if (goptions.prime & 1) {
 		/* start */
-		if (__sync_fetch_and_add(refcnt, 1) == 0) {
+		int count = __sync_fetch_and_add(refcnt, 1);
+		assert(count < 0);
+		if (count == 0) {
 			goptions.sleep = goptions.prime;
 			handle_sleep();
 		}
 	} else {
 		/* stop */
-		if (__sync_add_and_fetch(refcnt, -1) == 0) {
+		int count = __sync_add_and_fetch(refcnt, -1);
+		assert(count < 0);
+		if (count == 0) {
 			goptions.sleep = goptions.prime;
 			handle_sleep();
 		}
