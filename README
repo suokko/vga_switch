@@ -67,3 +67,11 @@ Same as above for systemd configuration.
 /etc/vga_switch.conf
 
 Simple config to select card during boot.
+
+/usr/lib/xorg/modules/libvgaswitch.so 
+
+Wrappers to make sure HW is on when ddx driver tries to access it.
+
+/etx/X11/xorg.cond.d/vgaswitch.conf 
+
+Config to load the module.
