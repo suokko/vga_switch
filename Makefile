@@ -37,6 +37,8 @@ install: vga_switch libvgaswitch.so vga_prime
 	install -m 0644 libvgaswitch.so /usr/lib/xorg/modules/libvgaswitch.so
 	install -m 0755 vga_prime /usr/bin/vga_prime
 	install -m 0644 98vga_switch_hack /etc/X11/Xsession.d/98vga_switch_hack
+	mkdir -p /etc/X11/xorg.conf.d
+	install -m 0644 xorg.conf /etc/X11/xorg.conf.d/vgaswitch.conf
 	install -m 0755 init.script /etc/init.d/vga_switch
 	update-rc.d vga_switch defaults
 	install -m 0755 pm-vga /etc/pm/sleep.d/vga
@@ -49,5 +51,6 @@ uninstall:
 	${RM} /etc/X11/Xsession.d/98vga_switch_hack
 	update-rc.d vga_switch remove
 	${RM} /etc/init.d/vga_switch
+	${RM} /etc/X11/xorg.conf.d/vgaswitch.conf
 	${RM} /etc/pm/sleep.d/vga
 	${RM} /lib/systemd/system-sleep/vga.sh
