@@ -324,7 +324,7 @@ static int prime_start_stop(void)
 	if (goptions.prime & 1) {
 		/* start */
 		int count = __sync_fetch_and_add(refcnt, 1);
-		assert(count < 0);
+		assert(count >= 0);
 		if (count == 0) {
 			goptions.sleep = goptions.prime;
 			handle_sleep();
@@ -332,7 +332,7 @@ static int prime_start_stop(void)
 	} else {
 		/* stop */
 		int count = __sync_add_and_fetch(refcnt, -1);
-		assert(count < 0);
+		assert(count >= 0);
 		if (count == 0) {
 			goptions.sleep = goptions.prime;
 			handle_sleep();
