@@ -4,7 +4,7 @@
 
 if [ $(/sbin/vga_switch -q default) = "IGD" ]; then
 	xrandr --setprovideroffloadsink radeon Intel
-	sh -c "vga_switch -g start; sleep 10; vga_switch -g stop;" &
+	sh -c "/sbin/vga_switch -g start; sleep 10; /sbin/vga_switch -g stop;" &
 else
 	xrandr --setprovideroutputsource Intel radeon
 	xrandr --output LVDS2 --auto
